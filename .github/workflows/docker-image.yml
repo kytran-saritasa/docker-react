@@ -3,8 +3,6 @@ name: Docker Image CI
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
 
@@ -14,8 +12,26 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+    
     - name: Build the Docker image
       run: docker build . --file Dockerfile.dev --tag nhatkytran/docker-react
 
     - name: Run tests
       run: docker run -e CI=true nhatkytran/docker-react npm run test
+
+    - name: Generate deployment package
+      run: zip -r deploy.zip . -x '*.git*'
+
+    - name: Deploy to EB
+      uses: einaregilsson/beanstalk-deploy@v21
+      with:
+        aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+        aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+        application_name: frontend
+        environment_name: Frontend-env
+        existing_bucket_name: elasticbeanstalk-ap-southeast-1-221082189774
+        region: ap-southeast-1
+        version_label: ${{ github.sha }}
+        deployment_package: deploy.zip
